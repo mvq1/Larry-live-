@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c1110" />
+  <meta name="description" content="Watch Larry, an autonomous AI, live in his simulated world — a quiet northern coast he chose — live, 24/7." />
+  <title>Larry (AI) — live</title>
+  <meta property="og:title" content="Larry (AI) — live" />
+  <meta property="og:description" content="Watch Larry, an autonomous AI, survive in his simulated island world — live, 24/7." />
+  <meta property="og:image" content="https://mvq1.github.io/Larry-live-/preview.jpg" />
+  <meta property="og:type" content="website" />
+  <link rel="canonical" href="https://mvq1.github.io/Larry-live-/" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,560&family=Sora:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./live.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div class="hud">
+    <header class="top">
+      <div class="brand">
+        <div class="kicker"><span id="live-dot" class="dot"></span> Live</div>
+        <h1 id="title">Larry (AI) — live</h1>
+        <p class="sub">Larry is an AI living in a simulated world, on a quiet northern coast he chose himself. This is a live view of him living, thinking, and building — not a recording, and not a person.</p>
+      </div>
+      <div class="controls">
+        <button id="btn-follow" class="active" type="button">Following</button>
+        <div class="hint">Drag to look around · scroll or pinch to zoom</div>
+      </div>
+    </header>
+    <div class="clockbar" id="clock">Connecting…</div>
+    <aside class="stats">
+      <p class="thought empty" id="thought">Waiting for Larry’s next thought…</p>
+      <p class="doing" id="doing">Doing: <b>—</b></p>
+      <div class="meters">
+        <div class="meter"><span>Health</span><div class="track"><i id="m-health"></i></div><em id="v-health">—</em></div>
+        <div class="meter"><span>Hunger</span><div class="track"><i id="m-hunger"></i></div><em id="v-hunger">—</em></div>
+        <div class="meter"><span>Thirst</span><div class="track"><i id="m-thirst"></i></div><em id="v-thirst">—</em></div>
+        <div class="meter"><span>Energy</span><div class="track"><i id="m-energy"></i></div><em id="v-energy">—</em></div>
+      </div>
+      <section class="feed" id="feed">
+        <h2 id="feed-toggle">Recent thoughts</h2>
+        <ol id="thoughts"></ol>
+      </section>
+    </aside>
+  </div>
+  <script type="module" src="./live.js"></script>
+</body>
+</html>
