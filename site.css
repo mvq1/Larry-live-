@@ -1,0 +1,11 @@
+:root{--bg:#0c1110;--fg:#e9e4d8;--mut:#9aa39c;--acc:#d9a441;--card:#151c1a;--line:#26302d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 Sora,system-ui,sans-serif}
+a{color:var(--acc)}header{padding:22px 20px 8px;max-width:1100px;margin:auto}h1{font-family:Fraunces,serif;font-weight:560;margin:0 0 4px}
+nav a{margin-right:16px;text-decoration:none}nav a.on{color:var(--fg);border-bottom:2px solid var(--acc)}
+main{max-width:1100px;margin:auto;padding:8px 20px 60px}.mut{color:var(--mut)}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}.card img{width:100%;border-radius:8px;display:block}
+.num{font-family:Fraunces,serif;font-size:1.6rem}.stat{display:flex;gap:18px;flex-wrap:wrap}.stat .card{min-width:150px;flex:1}
+.q{font-family:Fraunces,serif;font-style:italic;margin:.6em 0}.traits span{display:inline-block;font-size:.8rem;border:1px solid var(--line);border-radius:999px;padding:2px 9px;margin:2px}
+ol.feed{list-style:none;padding:0}ol.feed li{border-bottom:1px solid var(--line);padding:10px 0}ol.feed time{color:var(--mut);font-size:.82rem}
+.btn{display:inline-block;background:var(--acc);color:#111;border-radius:8px;padding:6px 12px;text-decoration:none;font-weight:600}.btn.off{background:#3a3f3c;color:#aaa}
+pre.diary{white-space:pre-wrap;font-family:Fraunces,serif;font-size:1.02rem;background:var(--card);padding:16px;border-radius:12px;border:1px solid var(--line)}
