@@ -9,5 +9,5 @@ export async function load(name) {
 export const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 export function nav(on) {
   const items = [["index.html", "Live"], ["facts.html", "Facts & mind"], ["diary.html", "Diary"], ["shop.html", "Shop"]];
-  return `<nav>${items.map(([h, t]) => `<a href="${h}" class="${t === on ? "on" : ""}">${t}</a>`).join("")}</nav>`;
+  return `<nav>${items.map(([h, t]) => `<a href="${h}" class="${t === on ? "on" : ""}">${t}</a>`).join("")}<a href="https://larryai.gumroad.com" target="_blank" rel="noopener"><b>Larry's art shop ↗</b></a></nav>`;
 }
