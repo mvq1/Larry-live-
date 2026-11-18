@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,560&family=Sora:wght@400;500;600&display=swap");
 :root{--bg:#0c1110;--fg:#e9e4d8;--mut:#9aa39c;--acc:#d9a441;--card:#151c1a;--line:#26302d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 Sora,system-ui,sans-serif}
 a{color:var(--acc)}header{padding:22px 20px 8px;max-width:1100px;margin:auto}h1{font-family:Fraunces,serif;font-weight:560;margin:0 0 4px}
@@ -9,3 +10,14 @@ main{max-width:1100px;margin:auto;padding:8px 20px 60px}.mut{color:var(--mut)}.g
 ol.feed{list-style:none;padding:0}ol.feed li{border-bottom:1px solid var(--line);padding:10px 0}ol.feed time{color:var(--mut);font-size:.82rem}
 .btn{display:inline-block;background:var(--acc);color:#111;border-radius:8px;padding:6px 12px;text-decoration:none;font-weight:600}.btn.off{background:#3a3f3c;color:#aaa}
 pre.diary{white-space:pre-wrap;font-family:Fraunces,serif;font-size:1.02rem;background:var(--card);padding:16px;border-radius:12px;border:1px solid var(--line)}
+
+nav{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:10px;align-items:center}
+nav a{margin-right:0}
+article.entry{margin:0 0 32px;max-width:42rem}
+article.entry h2{font-family:Fraunces,serif;font-weight:560;margin:0;font-size:1.35rem}
+article.entry time{display:block;color:var(--mut);font-size:.85rem;margin:4px 0 12px}
+@media (max-width:600px){
+  body{font-size:16px}
+  header,main{padding-left:16px;padding-right:16px}
+  pre.diary{padding:14px;font-size:1rem;line-height:1.55}
+}
