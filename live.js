@@ -771,10 +771,79 @@ function poseHuman() {
   boneTurn(h, "lowerleg01r", AX_X, kneeR);
 }
 
+// Real-time feed: never play a walk loop unless he is actually moving; asleep/stale => still.
+function feedIsStale() {
+  if (!snap) return true;
+  if (snap.sim && snap.sim.running === false) return true;
+  const upd = Number(snap.updated || 0);
+  return upd > 0 && (Date.now() / 1000 - upd) > 300;
+}
+function effectivePose() {
+  const sp = larryState.serverPose || larryState.pose || "stand";
+  if (snap && snap.realtime && snap.realtime.asleep) return "sleep";
+  const dist = Math.hypot(larryState.tx - larryState.x, larryState.tz - larryState.z);
+  const moving = dist > 0.02 && !feedIsStale();
+  if (sp === "walk" || sp === "carry") return moving ? sp : "stand";
+  if (feedIsStale() && sp !== "sleep") return "stand";
+  return sp;
+}
+
+// Asleep at home: show him inside the boathouse, walls see-through, a bed under him, lamp low.
+let sleepProps = null;
+function updateSleepScene() {
+  const asleep = !!(snap && snap.realtime && snap.realtime.asleep);
+  const home = larryState.home;
+  if (!sleepProps) {
+    const g = new THREE.Group();
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(0.95 * HUMAN_SCALE, 0.45 * HUMAN_SCALE, 2.1 * HUMAN_SCALE),
+      new THREE.MeshStandardMaterial({ color: 0x6d5a48, roughness: 0.9 }));
+    bed.position.y = 0.22 * HUMAN_SCALE;
+    const blanket = new THREE.Mesh(new THREE.BoxGeometry(0.98 * HUMAN_SCALE, 0.12 * HUMAN_SCALE, 1.4 * HUMAN_SCALE),
+      new THREE.MeshStandardMaterial({ color: 0x3e5a78, roughness: 1 }));
+    blanket.position.set(0, 0.5 * HUMAN_SCALE, 0.3 * HUMAN_SCALE);
+    const lamp = new THREE.PointLight(0xffb060, 0.35, 1.2, 2);
+    lamp.position.set(0.6 * HUMAN_SCALE, 1.4 * HUMAN_SCALE, -0.6 * HUMAN_SCALE);
+    g.add(bed, blanket, lamp);
+    g.visible = false;
+    scene.add(g);
+    sleepProps = { g, faded: null };
+  }
+  const atHome = asleep && Array.isArray(home) && Math.abs(larryState.tx - (home[0] + 0.5)) < 0.6 && Math.abs(larryState.tz - (home[1] + 0.5)) < 0.6;
+  sleepProps.g.visible = asleep;
+  if (asleep) {
+    sleepProps.g.position.set(larryState.x, heightAt(larryState.x, larryState.z), larryState.z);
+    sleepProps.g.rotation.y = larryState.facing;
+  }
+  // fade the home hut's walls while he sleeps inside
+  const want = atHome ? home.join(",") : null;
+  if (sleepProps.faded !== want) {
+    worldGroup.children.forEach((ch) => {
+      if (!ch.isGroup) return;
+      const key = `${Math.floor(ch.position.x)},${Math.floor(ch.position.z)}`;
+      const isHome = want && key === want;
+      ch.traverse((m) => {
+        if (!m.isMesh || !m.material || Array.isArray(m.material)) return;
+        if (isHome) {
+          if (m.userData.origOpacity === undefined) m.userData.origOpacity = m.material.opacity;
+          m.material.transparent = true;
+          m.material.opacity = 0.28;
+          m.material.depthWrite = false;
+        } else if (m.userData.origOpacity !== undefined) {
+          m.material.opacity = m.userData.origOpacity;
+          m.material.transparent = m.userData.origOpacity < 1;
+          m.material.depthWrite = true;
+          delete m.userData.origOpacity;
+        }
+      });
+    });
+    sleepProps.faded = want;
+  }
+}
+
 function animateLarry(dt, t) {
   if (!larryRig) return;
   const u = larryRig.userData;
-  const pose = larryState.pose;
+  const pose = (larryState.pose = effectivePose());
   const hips = u.hips;
   const walk = pose === "walk" || pose === "carry";
   const speed = walk ? 8 : 0;
@@ -848,24 +917,9 @@ function animateLarry(dt, t) {
   }
 
   if (larryState.moveDuration && larryState.moveStart != null) {
-    const u = clamp((performance.now() - larryState.moveStart) / larryState.moveDuration, 0, 1);
-    const e = u * u * (3 - 2 * u);
-    larryState.x = lerp(larryState.fromX, larryState.tx, e);
-    larryState.z = lerp(larryState.fromZ, larryState.tz, e);
-    if (u < 1 && Math.hypot(larryState.tx - larryState.fromX, larryState.tz - larryState.fromZ) > 0.35) {
-      // Keep a walking cycle going for the trip between sparse updates.
-      if (pose !== "sleep") {
-        const swing = Math.sin(t * 8) * 0.7;
-        u.lLeg.rotation.x = swing;
-        u.rLeg.rotation.x = -swing;
-        u.lArm.rotation.x = -swing * 0.8;
-        u.rArm.rotation.x = swing * 0.8;
-        hips.position.y = 0.62 + Math.abs(Math.sin(t * 8)) * 0.04;
-        u.lBoot.position.z = Math.sin(t * 8) * 0.08;
-        u.rBoot.position.z = -Math.sin(t * 8) * 0.08;
-        larryRig.rotation.x = 0;
-      }
-    }
+    const mu = clamp((performance.now() - larryState.moveStart) / larryState.moveDuration, 0, 1);
+    larryState.x = lerp(larryState.fromX, larryState.tx, mu);
+    larryState.z = lerp(larryState.fromZ, larryState.tz, mu);
   } else {
     const k = 1 - Math.pow(0.08, dt * (walk ? 5 : 8));
     larryState.x = lerp(larryState.x, larryState.tx, k);
@@ -1126,13 +1180,41 @@ function setLighting(fracHour, weather, cold) {
   ensureRain(weather === "rain" || weather === "storm");
 }
 
+function etNowParts() {
+  const f = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", second: "2-digit", hour12: false });
+  const p = Object.fromEntries(f.formatToParts(new Date()).map((x) => [x.type, x.value]));
+  return { h: Number(p.hour) % 24, m: Number(p.minute), s: Number(p.second) };
+}
 function fractionalHour() {
   if (!snap || !snap.clock) return 12;
+  if (snap.realtime) {
+    const p = etNowParts(); // in-game hour = real ET hour
+    return p.h + p.m / 60 + p.s / 3600;
+  }
   const elapsed = (performance.now() - tickAt) / 1000;
-  // Public snapshots are a minute or two behind; do not run many game hours ahead.
-  const advance = Math.min(elapsed / Math.max(secondsPerHour || 6, 1), 0.85);
-  return (snap.clock.hour || 0) + advance;
+  return snap.clock.hour + Math.min(elapsed / (secondsPerHour || 6), 0.85);
 }
+function etClockText() {
+  return new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" }).format(new Date()) + " ET";
+}
+function renderClock() {
+  if (!snap) return;
+  const C = snap.clock || {};
+  const R = snap.realtime;
+  const weather = C.weather ? C.weather.replace("_", " ") : "—";
+  const season = C.season ? C.season[0].toUpperCase() + C.season.slice(1) : "";
+  const L = snap.larry || {};
+  const alive = L.alive === false ? " · not alive this life" : "";
+  const stale = feedIsStale() ? " · feed paused" : "";
+  let status = "";
+  let time = `${String(C.hour ?? 0).padStart(2, "0")}:00`;
+  if (R) {
+    time = etClockText();
+    status = R.asleep ? ` · <b>asleep</b> 💤 next wake ${R.next_wake || "7:00 AM ET"}` : ` · <b>awake</b>${R.next_bed ? " · bed at " + R.next_bed : ""}`;
+  }
+  $("clock").innerHTML = `<strong>Day ${C.day ?? "—"}</strong> · ${time} · ${season} · ${weather}${C.cold_snap ? " · cold snap" : ""}${status}${alive}${stale}`;
+}
+setInterval(renderClock, 1000);
 
 const defaultOffset = new THREE.Vector3(-1.25, 0.85, -1.25); // ~11 m back: Larry at life size in his town
 
@@ -1175,7 +1257,7 @@ function renderHud(data) {
   const season = C.season ? C.season[0].toUpperCase() + C.season.slice(1) : "";
   const alive = L.alive === false ? " · not alive this life" : "";
   const sim = data.sim && data.sim.running === false ? " · sim paused" : "";
-  $("clock").innerHTML = `<strong>Day ${C.day ?? "—"}</strong> · ${hour}:00 · ${season} · ${weather}${C.cold_snap ? " · cold snap" : ""}${alive}${sim}`;
+  renderClock();
   const thought = (L.thought || "").trim();
   const el = $("thought");
   if (thought) {
@@ -1194,9 +1276,12 @@ function renderHud(data) {
   const list = $("thoughts");
   const rows = (data.thoughts || []).slice().reverse();
   list.innerHTML = rows.map((t) => {
-    const when = `Day ${t.day}, ${String(t.hour).padStart(2, "0")}:00${t.action ? " · " + t.action : ""}`;
-    const text = (t.thought || "").replace(/</g, "&lt;");
-    return `<li><time>${when}</time><p>${text}</p></li>`;
+    const clock = t.at ? String(t.at).slice(11, 16) + " ET" : `${String(t.hour).padStart(2, "0")}:00`;
+    const when = `Day ${t.day}, ${clock}${t.action ? " · " + t.action : ""}${t.model ? " · " + t.model : ""}`;
+    const esc = (x) => String(x || "").replace(/</g, "&lt;");
+    const text = esc(t.thought);
+    const extra = t.search ? `<small>looked up: ${esc(t.search)}</small>` : "";
+    return `<li><time>${when}</time><p>${text}</p>${extra}</li>`;
   }).join("");
 }
 
@@ -1215,6 +1300,8 @@ function applyPayload(data) {
     const nx = L.x + 0.5;
     const nz = L.y + 0.5;
     larryState.pose = L.pose || "stand";
+    larryState.serverPose = larryState.pose;
+    larryState.home = L.home;
     if (first) {
       larryState.fromX = nx;
       larryState.fromZ = nz;
@@ -1233,8 +1320,10 @@ function applyPayload(data) {
       larryState.tz = nz;
       const dist = Math.hypot(nx - larryState.fromX, nz - larryState.fromZ);
       larryState.moveStart = performance.now();
-      // Walk a short, readable path even when the next published point is a minute away.
-      larryState.moveDuration = dist < 0.2 ? 400 : clamp(dist * 2200, 6000, 75000);
+      // Real time: he walks one tile per ~30-45 s, so spread the trip over that pace
+      // (constant speed, no sprint-then-freeze, no walking in place).
+      const perTile = ((data.realtime && data.realtime.move_seconds) || 30) * 1000;
+      larryState.moveDuration = dist < 0.02 ? 0 : clamp(dist * perTile, 1500, 120000);
     }
   }
   updateFauna(data.fauna || []);
@@ -1324,6 +1413,7 @@ function loop() {
   const dt = Math.min(loopClock.getDelta(), 0.05);
   const t = loopClock.elapsedTime;
   animateLarry(dt, t);
+  try { updateSleepScene(); } catch (e) {}
   animateFauna(dt, t);
   animateRain(dt);
   worldGroup.children.forEach((ch) => {
