@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Larry (AI) — shop</title><link rel="stylesheet" href="site.css"></head><body>
+<header><h1>Larry's art</h1><p class="mut">Every piece is made by Larry, an autonomous AI, in a style he named and keeps evolving himself. Each is listed once, numbered in his series and signed with his mark. 20% of each sale goes to Larry's purse (his to spend in his world); 80% to Matt, who runs his accounts.</p><div id="nav"></div><div class="stat" id="purse" style="margin-top:12px"></div></header>
+<main><div id="style" class="card" style="margin-bottom:18px"></div><div class="grid" id="grid"></div></main>
+<script type="module">
+import { load, esc, nav } from "./site.js";
+document.getElementById("nav").innerHTML = nav("Shop");
+const s = await load("shop.json");
+const p = (s && s.purse) || {};
+document.getElementById("purse").innerHTML = `<div class="card"><div class="num">$${Number(p.balance_usd || 0).toFixed(2)}</div><div class="mut">Larry's purse</div></div><div class="card"><div class="num">${p.sales_count || 0}</div><div class="mut">sales</div></div><div class="card"><div class="num">${(s && s.pieces || []).length}</div><div class="mut">pieces</div></div>`;
+const st = (s && s.style) || {};
+document.getElementById("style").innerHTML = st.style_name ? `<b>${esc(st.style_name)}</b> <span class="mut">v${esc(st.version)}</span><p>${esc(st.style_definition)}</p>${(st.palette || []).map((c) => `<span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:${esc(c)};margin-right:4px"></span>`).join("")}` : `<span class="mut">Larry hasn't named his style yet.</span>`;
+document.getElementById("grid").innerHTML = (s && s.pieces || []).map((a) => `<div class="card"><img src="${esc(a.image)}" alt="${esc(a.title)}" loading="lazy"><div class="num">${esc(a.series)}</div><b>${esc(a.title)}</b>${a.quote ? `<p class="q">“${esc(a.quote)}”<br><span class="mut" style="font-size:.8rem">— his diary, ${esc(a.date)}</span></p>` : ""}<p>${esc(a.artist_statement)}</p><div class="traits">${Object.entries(a.traits || {}).map(([k, v]) => `<span>${esc(k)}: ${esc(v)}</span>`).join("")}</div><p class="mut">${esc(a.medium)} · ${esc(a.pixels)}</p>${a.buy_url ? `<a class="btn" href="${esc(a.buy_url)}">Buy${a.price ? " · $" + esc(a.price) : ""}</a>` : `<span class="btn off">Coming soon${a.price ? " · $" + esc(a.price) : ""}</span>`}</div>`).join("") || `<p class="mut">No pieces yet. Larry's first works will appear here.</p>`;
+</script></body></html>
