@@ -1,5 +1,11 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+// Life-size world: one tile is 6 m, so a 1.8 m person is 0.3 tiles tall.
+const METERS_PER_TILE = 6;
+const HUMAN_SCALE = 1 / METERS_PER_TILE; // world units per meter for people and animals
+const LARRY_GLB_URL = new URL("larry.glb", import.meta.url).href;
 
 const canvas = document.getElementById("view");
 const $ = (id) => document.getElementById(id);
@@ -51,12 +57,12 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 
-const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 220);
+const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.02, 220);
 camera.position.set(4, 8, 16);
 const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
-controls.minDistance = 3;
+controls.minDistance = 0.5;
 controls.maxDistance = 52;
 controls.maxPolarAngle = Math.PI * 0.48;
 controls.minPolarAngle = 0.18;
@@ -397,7 +403,7 @@ function buildStructures(map) {
       roof.rotation.y = Math.PI / 4;
       roof.castShadow = true;
       g.add(roof);
-      g.add(boxMesh(0.16, 0.28, 0.04, 0x2a1a10, 0, 0.2, bw / 2 + 0.005));
+      g.add(boxMesh(0.17, 0.36, 0.04, 0x2a1a10, 0, 0.18, bw / 2 + 0.005));
       if (improved) g.add(boxMesh(0.1, 0.28, 0.1, 0x4a2812, bw * 0.25, bh + 0.28, -bw * 0.15));
     } else if (kind === "storage") {
       g.add(boxMesh(0.55, 0.42, 0.42, 0x5a4632, 0, 0.22, 0));
@@ -424,7 +430,11 @@ function buildStructures(map) {
     } else if (TOWN_BUILDINGS[kind]) {
       const [wall, roofC, bw, bh] = TOWN_BUILDINGS[kind];
       const wc = kind === "house" ? HOUSE_COLORS[(s.x * 7 + s.y * 3) % HOUSE_COLORS.length] : wall;
-      g.add(boxMesh(bw, bh, bw * 0.9, wc, 0, bh / 2, 0));
+      const bhL = bh * 1.55; // walls 5-9 m at 6 m per tile
+      g.add(boxMesh(bw, bhL, bw * 0.9, wc, 0, bhL / 2, 0));
+      for (const wx of [-bw * 0.28, bw * 0.28]) {
+        for (const wy of [bhL * 0.38, bhL * 0.75]) g.add(boxMesh(0.17, 0.2, 0.02, 0x9fb4c4, wx, wy, bw * 0.45 + 0.01));
+      }
       const roof = new THREE.Mesh(
         new THREE.CylinderGeometry(0.01, bw * 0.62, bw * 0.95, 3, 1),
         new THREE.MeshStandardMaterial({ color: roofC, roughness: 0.9 })
@@ -432,12 +442,12 @@ function buildStructures(map) {
       roof.rotation.z = Math.PI / 2;
       roof.rotation.x = Math.PI / 6;
       roof.scale.set(1, 1, 0.55);
-      roof.position.y = bh + 0.12;
+      roof.position.y = bhL + 0.12;
       roof.castShadow = true;
       g.add(roof);
-      g.add(boxMesh(0.14, 0.26, 0.03, 0x2a2420, 0, 0.13, bw * 0.45 + 0.01));
-      if (kind === "chapel") g.add(boxMesh(0.2, 0.9, 0.2, wc, -bw * 0.3, bh + 0.35, 0));
-      if (kind === "market" || kind === "cafe") g.add(boxMesh(bw, 0.03, 0.3, 0xeeeee6, 0, bh * 0.75, bw * 0.45 + 0.15));
+      g.add(boxMesh(0.17, 0.36, 0.03, 0x2a2420, 0, 0.18, bw * 0.45 + 0.01)); // ~1 x 2.1 m door
+      if (kind === "chapel") g.add(boxMesh(0.2, 0.9, 0.2, wc, -bw * 0.3, bhL + 0.35, 0));
+      if (kind === "market" || kind === "cafe") g.add(boxMesh(bw, 0.03, 0.3, 0xeeeee6, 0, 0.5, bw * 0.45 + 0.15));
     } else if (kind === "smoke_rack") {
       g.add(boxMesh(0.06, 0.7, 0.06, 0x4a3a2a, -0.25, 0.35, 0));
       g.add(boxMesh(0.06, 0.7, 0.06, 0x4a3a2a, 0.25, 0.35, 0));
@@ -679,7 +689,86 @@ function ensureLarry(appearance) {
   if (larryRig) { scene.remove(larryRig); clearGroup(larryRig); }
   larryRig = makeLarry(appearance && appearance.chosen ? appearance : null);
   larryRig.userData.appearanceKey = key;
+  larryRig.scale.setScalar(HUMAN_SCALE * (1.8 / 1.75)); // primitive rig is ~1.75 units tall
   scene.add(larryRig);
+  attachHumanModel(larryRig);
+}
+
+// The real 3D Larry (MakeHuman CC0 base, exported by render_human.py in his current colors).
+let humanGltf = null;
+let humanGltfPromise = null;
+function loadHuman() {
+  if (!humanGltfPromise) {
+    humanGltfPromise = new Promise((resolve) => {
+      new GLTFLoader().load(LARRY_GLB_URL, (gltf) => { humanGltf = gltf; resolve(gltf); }, undefined, () => resolve(null));
+    });
+  }
+  return humanGltfPromise;
+}
+
+function attachHumanModel(rig) {
+  loadHuman().then((gltf) => {
+    if (!gltf || rig !== larryRig) return;
+    const model = gltf.scene;
+    model.traverse((o) => {
+      if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
+    });
+    const wrap = new THREE.Group();
+    wrap.scale.setScalar(1.75 / 1.8); // meters -> primitive-rig units (rig itself is scaled to life size)
+    wrap.add(model);
+    rig.add(wrap);
+    const bones = {};
+    model.traverse((o) => {
+      if (o.isBone) bones[o.name.replace(/[^A-Za-z0-9]/g, "").toLowerCase()] = { bone: o, rest: o.quaternion.clone() };
+    });
+    rig.userData.human = { wrap, bones };
+    rig.userData.hips.visible = false; // hide the primitive body (pack/axe/hands go with it)
+    rig.userData.hipsBaseY = 0.96;
+  });
+}
+
+const _qa = new THREE.Quaternion();
+const _qb = new THREE.Quaternion();
+const _qp = new THREE.Quaternion();
+const _qr = new THREE.Quaternion();
+const _ax = new THREE.Vector3();
+function boneTurn(h, name, axis, angle, axis2, angle2) {
+  const b = h.bones[name];
+  if (!b) return;
+  b.bone.quaternion.copy(b.rest);
+  if (!angle && !angle2) return;
+  // rotate about rig-space axes, expressed in the parent's frame
+  b.bone.parent.updateWorldMatrix(true, false);
+  b.bone.parent.getWorldQuaternion(_qp);
+  larryRig.getWorldQuaternion(_qr);
+  _qp.premultiply(_qr.invert());
+  const inv = _qp.clone().invert();
+  _qa.identity();
+  if (angle2) _qa.multiply(_qb.setFromAxisAngle(_ax.copy(axis2).applyQuaternion(inv).normalize(), angle2));
+  if (angle) _qa.premultiply(_qb.setFromAxisAngle(_ax.copy(axis).applyQuaternion(inv).normalize(), angle));
+  b.bone.quaternion.premultiply(_qa);
+}
+
+const AX_X = new THREE.Vector3(1, 0, 0);
+const AX_Z = new THREE.Vector3(0, 0, 1);
+function poseHuman() {
+  const u = larryRig && larryRig.userData;
+  const h = u && u.human;
+  if (!h) return;
+  h.wrap.position.y = (u.hips.position.y - (u.hipsBaseY || 0.96));
+  boneTurn(h, "spine03", AX_X, u.hips.rotation.x * 0.6);
+  boneTurn(h, "spine01", AX_X, u.hips.rotation.x * 0.4);
+  // A-pose -> arms down, then the primitive's swing about the left-right axis
+  boneTurn(h, "upperarm01l", AX_X, u.lArm.rotation.x, AX_Z, -0.95 + (u.lArm.rotation.z || 0));
+  boneTurn(h, "upperarm01r", AX_X, u.rArm.rotation.x, AX_Z, 0.95 + (u.rArm.rotation.z || 0));
+  boneTurn(h, "lowerarm01l", AX_X, -0.25);
+  boneTurn(h, "lowerarm01r", AX_X, -0.25);
+  boneTurn(h, "upperleg01l", AX_X, u.lLeg.rotation.x);
+  boneTurn(h, "upperleg01r", AX_X, u.rLeg.rotation.x);
+  const kneeL = u.lLeg.rotation.x < -0.5 ? -u.lLeg.rotation.x : Math.max(0, u.lLeg.rotation.x) * 0.6;
+  const kneeR = u.rLeg.rotation.x < -0.5 ? -u.rLeg.rotation.x : Math.max(0, u.rLeg.rotation.x) * 0.6;
+  boneTurn(h, "lowerleg01l", AX_X, kneeL);
+  boneTurn(h, "lowerleg01r", AX_X, kneeR);
 }
 
 function animateLarry(dt, t) {
@@ -792,6 +881,7 @@ function animateLarry(dt, t) {
   larryState.y = heightAt(larryState.x, larryState.z);
   larryRig.position.set(larryState.x, larryState.y, larryState.z);
   larryRig.rotation.y = larryState.facing;
+  poseHuman();
 }
 
 function addBox(g, w, h, d, color, x, y, z) {
@@ -812,6 +902,16 @@ const TOWN_BUILDINGS = {
 const HOUSE_COLORS = [0xa03a30, 0xd6b660, 0xe4e2d6, 0x56708c, 0x788c6c, 0xb07846];
 
 function makeAnimal(kind) {
+  const outer = new THREE.Group();
+  const g = makeAnimalInner(kind);
+  // primitives were ~0.75 units for a person; 1.8 m = 0.3 units at 6 m per tile
+  g.scale.setScalar(kind === "person" ? 0.4 : 0.45);
+  outer.add(g);
+  outer.userData = g.userData;
+  return outer;
+}
+
+function makeAnimalInner(kind) {
   const g = new THREE.Group();
   g.userData.kind = kind;
   if (kind === "person") {
@@ -1034,11 +1134,11 @@ function fractionalHour() {
   return (snap.clock.hour || 0) + advance;
 }
 
-const defaultOffset = new THREE.Vector3(-5.2, 3.6, -5.2);
+const defaultOffset = new THREE.Vector3(-1.25, 0.85, -1.25); // ~11 m back: Larry at life size in his town
 
 function updateCamera() {
   if (!follow || !larryRig) { controls.update(); return; }
-  const look = new THREE.Vector3(larryState.x, larryState.y + 1.35, larryState.z);
+  const look = new THREE.Vector3(larryState.x, larryState.y + 1.35 * HUMAN_SCALE, larryState.z);
   const delta = look.clone().sub(controls.target);
   controls.target.copy(look);
   camera.position.add(delta);
@@ -1047,7 +1147,7 @@ function updateCamera() {
 
 function resetChase() {
   if (!larryRig) return;
-  const look = new THREE.Vector3(larryState.x, larryState.y + 1.35, larryState.z);
+  const look = new THREE.Vector3(larryState.x, larryState.y + 1.35 * HUMAN_SCALE, larryState.z);
   controls.target.copy(look);
   camera.position.copy(look).add(defaultOffset);
   follow = true;
